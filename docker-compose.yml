@@ -1,0 +1,36 @@
+services:
+  mongo:
+    image: mongo:8.0
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: local-only-change-me
+      MONGO_INITDB_DATABASE: city_air
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - ./mongo/init.js:/docker-entrypoint-initdb.d/01-init.js:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--username", "root", "--password", "local-only-change-me", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  ingest:
+    build: .
+    restart: "no"
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      MONGO_URI: mongodb://root:local-only-change-me@mongo:27017/?authSource=admin
+      MONGO_DATABASE: city_air
+      MONGO_COLLECTION: measurements
+      DATASET_URL: https://archive.ics.uci.edu/static/public/501/beijing+multi+site+air+quality+data.zip
+      BATCH_SIZE: "1000"
+      MAX_RETRIES: "5"
+      RETRY_BASE_SECONDS: "1"
+
+volumes:
+  mongo_data:
