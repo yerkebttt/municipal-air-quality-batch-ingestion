@@ -22,8 +22,8 @@ from src.transform import batched, normalize_row
 LOG = logging.getLogger("air_quality_ingest")
 DATASET_NAME = "UCI Beijing Multi-Site Air Quality"
 DATASET_URL = (
-    "https://archive.ics.uci.edu/static/public/501/"
-    "beijing+multi+site+air+quality+data.zip"
+    "https://archive.ics.uci.edu/ml/machine-learning-databases/00501/"
+    "PRSA2017_Data_20130301-20170228.zip"
 )
 
 def write_batch_with_retry(

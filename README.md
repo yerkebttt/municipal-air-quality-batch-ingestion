@@ -4,7 +4,7 @@ A portable Task 1 prototype for loading a public multi-site air-quality dataset 
 
 ## Dataset
 
-The default input is the UCI Machine Learning Repository's **Beijing Multi-Site Air Quality** dataset (UCI dataset 501). It contains 420,768 hourly records from 12 monitoring stations, recorded from 2013 to 2017. The CSV fields include timestamp parts, station, PM2.5, PM10, SO2, NO2, CO, O3, temperature, pressure, dew point, rain, wind direction, and wind speed. The loader downloads the official ZIP when the container starts and processes the CSV files one at a time.
+The default input is the UCI Machine Learning Repository's **Beijing Multi-Site Air Quality** dataset (UCI dataset 501). It contains 420,768 hourly records from 12 monitoring stations, recorded from 2013 to 2017. The loader downloads UCI's `PRSA2017_Data_20130301-20170228.zip` archive, which contains one CSV for each monitoring station, and processes the CSV files one at a time. The rows contain timestamp parts, station, PM2.5, PM10, SO2, NO2, CO, O3, temperature, pressure, dew point, rain, wind direction, and wind speed.
 
 Source: <https://archive.ics.uci.edu/dataset/501/beijing+multi+site+air+quality+data>
 
