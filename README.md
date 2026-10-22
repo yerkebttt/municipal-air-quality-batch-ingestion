@@ -77,7 +77,7 @@ docker compose run --rm ingest python -m src.queries quality
 Run the four stakeholder query checks with a 2,000 ms target:
 
 ```bash
-docker compose --profile verification up --build --abort-on-container-exit
+docker compose --profile verification up --build --exit-code-from verify
 ```
 
 Run an individual query or review example alert candidates:

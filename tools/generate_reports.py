@@ -284,7 +284,7 @@ def build_product(s: dict[str, ParagraphStyle]) -> None:
         Paragraph(
             "docker compose run --rm ingest python -m src.queries trend --station Aotizhongxin --pollutant pm25<br/>"
             "docker compose run --rm ingest python -m src.queries compare --pollutant pm25<br/>"
-            "docker compose --profile verification up --build --abort-on-container-exit",
+            "docker compose --profile verification up --build --exit-code-from verify",
             s["code"],
         ),
         Paragraph(
