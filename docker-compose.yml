@@ -33,6 +33,7 @@ services:
       RETRY_BASE_SECONDS: "1"
       QUALITY_RULES_PATH: /app/config/quality_rules.json
       QUERY_SLA_MS: "2000"
+      EXPECTED_SOURCE_ROWS: "420768"
 
   verify:
     build: .

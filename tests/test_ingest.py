@@ -5,7 +5,7 @@ import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from src.ingest import _rejection_id, iter_csv_rows
+from src.ingest import _rejection_id, iter_csv_rows, validate_reconciliation
 from src.quality import DEFAULT_RULES, assess_document
 from src.queries import compare_stations_pipeline, daily_trend_pipeline, timed_query
 from src.transform import batched, normalize_row
@@ -99,6 +99,19 @@ class StakeholderQueryTests(unittest.TestCase):
         report = timed_query("test", 1000, lambda: [1, 2])
         self.assertEqual(report["rows_returned"], 2)
         self.assertTrue(report["meets_sla"])
+
+
+class ReconciliationTests(unittest.TestCase):
+    def test_accepts_complete_reconciliation(self):
+        validate_reconciliation(10, 9, 1, 7, 2, 1, 10)
+
+    def test_rejects_unexpected_source_size(self):
+        with self.assertRaisesRegex(RuntimeError, "unexpected source size"):
+            validate_reconciliation(9, 9, 0, 7, 2, 0, 10)
+
+    def test_rejects_unclassified_rows(self):
+        with self.assertRaisesRegex(RuntimeError, "classification mismatch"):
+            validate_reconciliation(10, 10, 0, 7, 2, 0, 10)
 
 
 if __name__ == "__main__":

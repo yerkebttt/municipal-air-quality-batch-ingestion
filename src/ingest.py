@@ -30,6 +30,32 @@ DATASET_URL = (
     "beijing+multi+site+air+quality+data.zip"
 )
 
+
+def validate_reconciliation(
+    source_rows: int,
+    stored_rows: int,
+    quarantined_rows: int,
+    accepted_rows: int,
+    warning_rows: int,
+    rejected_rows: int,
+    expected_rows: int | None,
+) -> None:
+    """Fail the run when source, quality and persistence counters do not reconcile."""
+    classified_rows = accepted_rows + warning_rows + rejected_rows
+    if classified_rows != source_rows:
+        raise RuntimeError(
+            f"classification mismatch: source={source_rows}, classified={classified_rows}"
+        )
+    if stored_rows + quarantined_rows != source_rows:
+        raise RuntimeError(
+            "persistence mismatch: "
+            f"source={source_rows}, stored={stored_rows}, quarantined={quarantined_rows}"
+        )
+    if expected_rows is not None and source_rows != expected_rows:
+        raise RuntimeError(
+            f"unexpected source size: expected={expected_rows}, actual={source_rows}"
+        )
+
 def write_batch_with_retry(
     collection: Collection,
     batch: list[dict[str, Any]],
@@ -160,6 +186,8 @@ def main() -> None:
     max_retries = int(os.getenv("MAX_RETRIES", "5"))
     retry_base_seconds = float(os.getenv("RETRY_BASE_SECONDS", "1"))
     dataset_url = os.getenv("DATASET_URL", DATASET_URL)
+    expected_rows_text = os.getenv("EXPECTED_SOURCE_ROWS", "420768").strip()
+    expected_rows = int(expected_rows_text) if expected_rows_text else None
     quality_rules = load_quality_rules(os.getenv("QUALITY_RULES_PATH"))
 
     with tempfile.TemporaryDirectory(prefix="air-quality-") as temporary_directory:
@@ -181,6 +209,18 @@ def main() -> None:
                     quality_rules,
                 )
                 stored = collection.count_documents({})
+                quarantined = database["rejected_measurements"].count_documents(
+                    {"dataset": DATASET_NAME}
+                )
+                validate_reconciliation(
+                    source_rows=total,
+                    stored_rows=stored,
+                    quarantined_rows=quarantined,
+                    accepted_rows=monitor.counters.accepted_rows,
+                    warning_rows=monitor.counters.warning_rows,
+                    rejected_rows=monitor.counters.rejected_rows,
+                    expected_rows=expected_rows,
+                )
                 monitor.succeed(stored)
                 LOG.info(
                     "Run complete: seen=%s accepted=%s warnings=%s rejected=%s stored=%s",

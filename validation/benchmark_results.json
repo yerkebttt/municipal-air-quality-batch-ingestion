@@ -1,0 +1,17 @@
+{
+  "context": "Complete local Docker Compose verification run",
+  "source_rows": 420768,
+  "stored_rows": 420768,
+  "accepted_rows": 383964,
+  "warning_rows": 36804,
+  "rejected_rows": 0,
+  "query_sla_ms": 2000,
+  "checks": [
+    {"query": "planner_latest_24h", "elapsed_ms": 15.931, "meets_sla": true},
+    {"query": "analyst_daily_pm25_trend", "elapsed_ms": 16.505, "meets_sla": true},
+    {"query": "policy_station_comparison", "elapsed_ms": 21.217, "meets_sla": true},
+    {"query": "data_steward_quality_summary", "elapsed_ms": 221.352, "meets_sla": true}
+  ],
+  "all_queries_meet_sla": true,
+  "note": "Timing is evidence from one local run and is not a universal production guarantee."
+}

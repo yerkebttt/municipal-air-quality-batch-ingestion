@@ -56,7 +56,7 @@ Collections:
 - `query_benchmarks` - repeatable response-time evidence;
 - `source_metadata` - purpose, expected row count and known limitations.
 
-Indexes cover station/time lookup, cross-station time windows and quality/time review. Writes use batches of 1,000 and bounded exponential backoff for transient MongoDB errors. A single local MongoDB container demonstrates portability, not high availability; a production service needs secrets, TLS, backups, a replica set and measured shard-key design.
+Indexes cover station/time lookup, cross-station time windows and quality/time review. Writes use batches of 1,000 and bounded exponential backoff for transient MongoDB errors. Before a run can be marked successful, source, classification, stored and quarantine counters must reconcile, and the fixture row count must equal the configured expectation. A single local MongoDB container demonstrates portability, not high availability; a production service needs secrets, TLS, backups, a replica set and measured shard-key design.
 
 ## Run and verify
 
@@ -118,8 +118,9 @@ A prototype run succeeds when: all 420,768 source rows reconcile as stored or qu
 - `config/` - quality rules and non-authoritative threshold example
 - `mongo/init.js` - collections, validation, indexes and source limitations
 - `tests/` - transformation, quality, idempotency-key and query-contract tests
-- `validation/` - reproducible source-profile evidence
-- `docs/` - assessed portfolio PDFs
+- `validation/` - reproducible source-profile and benchmark evidence
+
+The assessed portfolio PDFs are intentionally not published in this open repository because they are examination submissions.
 
 ## References
 
