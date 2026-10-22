@@ -27,10 +27,27 @@ services:
       MONGO_URI: mongodb://root:local-only-change-me@mongo:27017/?authSource=admin
       MONGO_DATABASE: city_air
       MONGO_COLLECTION: measurements
-      DATASET_URL: https://archive.ics.uci.edu/ml/machine-learning-databases/00501/PRSA2017_Data_20130301-20170228.zip
+      DATASET_URL: https://archive.ics.uci.edu/static/public/501/beijing+multi+site+air+quality+data.zip
       BATCH_SIZE: "1000"
       MAX_RETRIES: "5"
       RETRY_BASE_SECONDS: "1"
+      QUALITY_RULES_PATH: /app/config/quality_rules.json
+      QUERY_SLA_MS: "2000"
+
+  verify:
+    build: .
+    profiles: ["verification"]
+    restart: "no"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      ingest:
+        condition: service_completed_successfully
+    command: ["python", "-m", "src.queries", "benchmark"]
+    environment:
+      MONGO_URI: mongodb://root:local-only-change-me@mongo:27017/?authSource=admin
+      MONGO_DATABASE: city_air
+      QUERY_SLA_MS: "2000"
 
 volumes:
   mongo_data:

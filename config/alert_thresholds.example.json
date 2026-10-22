@@ -1,0 +1,7 @@
+{
+  "policy_status": "example_only_replace_with_municipal_policy",
+  "pm25": 150,
+  "pm10": 250,
+  "no2": 200,
+  "o3": 180
+}

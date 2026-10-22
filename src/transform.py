@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Iterable, Iterator
 from zoneinfo import ZoneInfo
+
+from src.quality import DEFAULT_RULES, assess_document
 
 DATASET_NAME = "UCI Beijing Multi-Site Air Quality"
 SOURCE_TZ = ZoneInfo("Asia/Shanghai")
@@ -25,7 +27,10 @@ def _number(value: str | None) -> float | None:
         return None
 
 
-def normalize_row(row: dict[str, str]) -> dict[str, Any]:
+def normalize_row(
+    row: dict[str, str],
+    quality_rules: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Convert one source CSV row into a queryable, schema-tolerant document."""
     station = (row.get("station") or "").strip()
     if not station:
@@ -55,14 +60,17 @@ def normalize_row(row: dict[str, str]) -> dict[str, Any]:
             measurements[source_name.strip().lower()] = value if value is not None else raw_value.strip()
 
     timestamp_text = timestamp.isoformat(timespec="seconds")
-    return {
+    document = {
         "_id": f"{station}|{timestamp_text}",
         "station": station,
         "timestamp": timestamp,
         "source_timezone": "Asia/Shanghai",
         "measurements": measurements,
         "source": DATASET_NAME,
+        "source_record_number": (row.get("No") or "").strip() or None,
+        "ingested_at": datetime.now(timezone.utc),
     }
+    return assess_document(document, quality_rules or DEFAULT_RULES)
 
 
 def batched(items: Iterable[dict[str, Any]], size: int) -> Iterator[list[dict[str, Any]]]:

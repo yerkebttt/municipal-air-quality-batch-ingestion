@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "required_pollutants": ["pm25", "pm10", "so2", "no2", "co", "o3"],
+  "plausible_ranges": {
+    "pm25": [0, 1000],
+    "pm10": [0, 1500],
+    "so2": [0, 1000],
+    "no2": [0, 1000],
+    "co": [0, 20000],
+    "o3": [0, 1000],
+    "temperature_c": [-50, 60],
+    "pressure_hpa": [850, 1100],
+    "dew_point_c": [-70, 60],
+    "rain_mm": [0, 500],
+    "wind_speed_m_s": [0, 75]
+  }
+}

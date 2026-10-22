@@ -1,0 +1,35 @@
+{
+  "source": "UCI Beijing Multi-Site Air Quality",
+  "source_url": "https://archive.ics.uci.edu/static/public/501/beijing+multi+site+air+quality+data.zip",
+  "rules_version": "1.0",
+  "source_rows": 420768,
+  "accepted_rows": 383964,
+  "warning_rows": 36804,
+  "structurally_rejected_rows": 0,
+  "flags": {
+    "missing_pollutants": 36788,
+    "outside_screening_range": 16
+  },
+  "missing_pollutant_values": {
+    "co": 20701,
+    "no2": 12116,
+    "o3": 13277,
+    "pm10": 6449,
+    "pm25": 8739,
+    "so2": 9021
+  },
+  "stations": {
+    "Aotizhongxin": 35064,
+    "Changping": 35064,
+    "Dingling": 35064,
+    "Dongsi": 35064,
+    "Guanyuan": 35064,
+    "Gucheng": 35064,
+    "Huairou": 35064,
+    "Nongzhanguan": 35064,
+    "Shunyi": 35064,
+    "Tiantan": 35064,
+    "Wanliu": 35064,
+    "Wanshouxigong": 35064
+  }
+}

@@ -1,65 +1,132 @@
-# Municipal Air Quality Batch Ingestion
+# Municipal Air Quality Decision-Support Pipeline
 
-A portable Task 1 prototype for loading a public multi-site air-quality dataset into MongoDB in retryable batches. It is designed as the data-ingestion layer behind a city dashboard. The dashboard can query measurements by monitoring station and time; the loader itself does not issue health alerts.
+A stakeholder-driven batch pipeline that turns hourly sensor files into quality-labelled MongoDB records, operational run evidence and bounded-latency query outputs. It is a data layer for municipal applications, not a clinical system and not an autonomous public-warning service.
 
-## Dataset
+## Real-life scenario and stakeholders
 
-The default input is the UCI Machine Learning Repository's **Beijing Multi-Site Air Quality** dataset (UCI dataset 501). It contains 420,768 hourly records from 12 monitoring stations, recorded from 2013 to 2017. The loader downloads UCI's `PRSA2017_Data_20130301-20170228.zip` archive, which contains one CSV for each monitoring station, and processes the CSV files one at a time. The rows contain timestamp parts, station, PM2.5, PM10, SO2, NO2, CO, O3, temperature, pressure, dew point, rain, wind direction, and wind speed.
+The intended production setting is a municipality receiving signed hourly exports from its own calibrated monitoring network. The included UCI Beijing dataset is a **historical test fixture** used to exercise scale and missing-data behaviour; it is not evidence about another city.
+
+| Stakeholder | Decision or action | Data contract | Acceptance target |
+|---|---|---|---|
+| Environmental analyst | Investigate trends, gaps and anomalous readings | Raw station-hour records, quality flags and daily aggregates | Missing/out-of-range values remain visible; no silent zero filling |
+| City planner and policy team | Compare areas and before/after periods for interventions | Station comparison with observation counts and date window | One-month comparison completes within the prototype 2 s query SLA |
+| Public dashboard developer | Display recent conditions and trend charts | Latest 24 records and daily series by station | Indexed query completes within 2 s; quality status travels with readings |
+| Data engineer/steward | Operate and audit the feed | Run status, heartbeat, counters, quarantine and benchmark history | Every run ends `succeeded` or `failed`; source rows reconcile |
+| Authorised warning officer | Review threshold candidates before downstream notification | Only quality-accepted candidates plus an approved threshold policy | Prototype sends no alert; missing policy approval blocks notification |
+
+Hourly values can support operational trends, but they may be too coarse or too noisy for some exposure and health questions. A domain owner must define aggregation windows, legal thresholds and acceptable uncertainty before such use.
+
+## Architecture
+
+```mermaid
+flowchart TD
+    A["Municipal hourly export\nUCI fixture in prototype"] --> B["Parse and normalise"]
+    B --> C{"Structural validation"}
+    C -->|valid| D["Quality screening + flags"]
+    C -->|invalid| E["Rejected-measurements quarantine"]
+    D --> F["Idempotent MongoDB batch upsert"]
+    F --> G["User queries and SLA benchmark"]
+    F --> H["Run health and audit counters"]
+```
+
+## Dataset limitations and bias controls
+
+The UCI Beijing Multi-Site Air Quality fixture contains 420,768 hourly rows from 12 stations for 2013-2017. Its CSV files do not provide enough metadata here to establish sensor calibration, measurement precision, station siting, spatial representativeness or independence between nearby stations. Government publication is not treated as proof of correctness. Consequently:
+
+- the pipeline preserves source values and flags them instead of “correcting” them;
+- missing pollutant values remain absent, never zero;
+- structural failures go to a quarantine collection with a reason;
+- screening ranges are configurable technical plausibility checks, not medical limits;
+- counts and completeness accompany aggregates so users can see the evidence base;
+- the stored source metadata explicitly marks spatial and health-policy validation as incomplete.
+
+Production onboarding would require a station registry with coordinates, sensor model, calibration and maintenance history; signed source manifests; an approved retention policy; and comparison against independent reference monitors.
 
 Source: <https://archive.ics.uci.edu/dataset/501/beijing+multi+site+air+quality+data>
 
-## Run locally
+## Data model and reliability
 
-Requirements: Docker Desktop or Docker Engine with Docker Compose.
+Each measurement document represents one station-hour. Its deterministic `_id` (`station|local ISO timestamp`) and `$setOnInsert` upsert make retries and full replays idempotent. MongoDB stores the timezone-aware instant while `source_timezone` preserves interpretation. `measurements` is flexible for future metrics; shared fields and the embedded `quality` object are schema-validated.
+
+Collections:
+
+- `measurements` - readings, provenance and quality assessment;
+- `rejected_measurements` - structurally unusable input rows and rejection reason;
+- `ingestion_runs` - status, heartbeat, duration and reconciliation counters;
+- `query_benchmarks` - repeatable response-time evidence;
+- `source_metadata` - purpose, expected row count and known limitations.
+
+Indexes cover station/time lookup, cross-station time windows and quality/time review. Writes use batches of 1,000 and bounded exponential backoff for transient MongoDB errors. A single local MongoDB container demonstrates portability, not high availability; a production service needs secrets, TLS, backups, a replica set and measured shard-key design.
+
+## Run and verify
+
+Requirements: Docker Desktop or Docker Engine with Compose.
 
 ```bash
+docker compose down -v
 docker compose up --build
 ```
 
-The MongoDB service exposes port `27017`; its data is kept in a named Docker volume. The ingestion service waits for MongoDB's health check, downloads and extracts the dataset, and loads it in batches of 1,000 documents. It exits after a successful load. To stop the services while keeping stored data, run `docker compose down`. To reset the database and load again from scratch, run `docker compose down -v` and then `docker compose up --build`.
+In another terminal, inspect operational health and quality:
 
-The sample credentials in `docker-compose.yml` are for a local educational prototype only. Use secrets, TLS, network controls, and a managed or properly configured MongoDB deployment before any real use.
-
-## Data model
-
-Each document represents one station-hour. `_id` is deterministic (`station|ISO-8601 timestamp`) and is used as the uniqueness key. A document has `station`, a timezone-aware `timestamp`, `source_timezone`, a nested `measurements` object, and `source`. The source date fields are interpreted as Beijing local time (`Asia/Shanghai`); MongoDB stores BSON dates as UTC instants while the explicit source timezone preserves how the source record should be interpreted. The measurement object omits fields whose source values are missing and stores numeric values as numbers; unknown future sensor fields can be added there without redesigning every stored record.
-
-Example:
-
-```json
-{
-  "_id": "Aotizhongxin|2013-03-01T00:00:00+08:00",
-  "station": "Aotizhongxin",
-  "timestamp": "2013-02-28T16:00:00Z",
-  "source_timezone": "Asia/Shanghai",
-  "measurements": {"pm25": 4.0, "pm10": 4.0, "temperature_c": -0.7},
-  "source": "UCI Beijing Multi-Site Air Quality"
-}
+```bash
+docker compose run --rm ingest python -m src.monitoring
+docker compose run --rm ingest python -m src.queries quality
 ```
 
-The collection indexes `(station, timestamp)` for common dashboard filters. Stable IDs plus `$setOnInsert` upserts make a whole batch safe to retry after an uncertain write result. Bounded exponential backoff is used for transient MongoDB errors. The current proof of concept uses a single local MongoDB container; it demonstrates portability and restartable ingestion, not production high availability.
+Run the four stakeholder query checks with a 2,000 ms target:
 
-## Scale-out and operational notes
+```bash
+docker compose --profile verification up --build --abort-on-container-exit
+```
 
-For a larger deployment, move the same application to a MongoDB replica-set or sharded-cluster connection string, store credentials in a secret manager, and define a shard key only after measuring query patterns and distribution. A likely candidate to evaluate is a hashed station identifier combined with a time bucket, but it must be benchmarked against the municipality's actual queries. Sharding and replication add operational work; the local Compose setup does not provide either.
+Run an individual query or review example alert candidates:
 
-Before a citizen-facing warning service is built, the municipality must define authoritative thresholds, sensor-quality rules, alert ownership, and delivery safeguards. This prototype only makes validated readings available for downstream applications.
+```bash
+docker compose run --rm ingest python -m src.queries trend --station Aotizhongxin --pollutant pm25
+docker compose run --rm ingest python -m src.queries compare --pollutant pm25
+docker compose run --rm ingest python -m src.queries alerts --thresholds config/alert_thresholds.example.json
+```
 
-## Files
+The threshold file is deliberately marked `example_not_approved`. Candidate generation neither interprets health risk nor sends notifications.
 
-- `src/ingest.py` - download, transform, batch, retry, and upsert.
-- `mongo/init.js` - create collection and indexes.
-- `Dockerfile` and `docker-compose.yml` - portable local runtime.
-- `tests/` - transformation and batch-boundary checks.
-- `docs/` - portfolio phase PDFs generated with this submission.
+Run unit tests:
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+Reproduce the source quality profile without MongoDB:
+
+```bash
+python -m src.profile_dataset
+```
+
+The verified fixture profile is committed as `validation/dataset_profile.json`: 420,768 rows, of which 383,964 pass all configured checks and 36,804 carry warnings. No source row is structurally rejected; 36,788 rows lack at least one required pollutant and 16 contain at least one value outside a screening range. Warning records remain queryable.
+
+## Acceptance and failure criteria
+
+A prototype run succeeds when: all 420,768 source rows reconcile as stored or quarantined; duplicate station-hour keys are zero; a replay creates no additional measurements; each run has terminal status and counters; quality summaries are queryable; and all four benchmark queries meet the configured 2 s target in the stated local environment. Any unreconciled row, schema error, silent imputation, failed run, unapproved public notification or missed query target is a failure requiring investigation.
+
+## Repository structure
+
+- `src/ingest.py` - download, quarantine, batch, retry, upsert and run counters
+- `src/transform.py` - deterministic normalisation and provenance
+- `src/quality.py` - configurable completeness and plausibility flags
+- `src/queries.py` - stakeholder queries, alert candidates and latency benchmark
+- `src/monitoring.py` - operational run-health report
+- `config/` - quality rules and non-authoritative threshold example
+- `mongo/init.js` - collections, validation, indexes and source limitations
+- `tests/` - transformation, quality, idempotency-key and query-contract tests
+- `validation/` - reproducible source-profile evidence
+- `docs/` - assessed portfolio PDFs
 
 ## References
 
-- UCI Machine Learning Repository, Beijing Multi-Site Air Quality: <https://archive.ics.uci.edu/dataset/501/beijing+multi+site+air+quality+data>
-- MongoDB, Data Modeling: <https://www.mongodb.com/docs/manual/data-modeling/>
-- MongoDB, Sharding: <https://www.mongodb.com/docs/manual/sharding/>
-- MongoDB, PyMongo Bulk Write Operations: <https://www.mongodb.com/docs/languages/python/pymongo-driver/current/crud/bulk-write/>
+- UCI Machine Learning Repository, *Beijing Multi-Site Air Quality Data*: <https://archive.ics.uci.edu/dataset/501/beijing+multi+site+air+quality+data>
+- MongoDB, *Data Modeling*: <https://www.mongodb.com/docs/manual/data-modeling/>
+- MongoDB, *Schema Validation*: <https://www.mongodb.com/docs/manual/core/schema-validation/>
+- MongoDB, *Indexes*: <https://www.mongodb.com/docs/manual/indexes/>
+- MongoDB, *Bulk Write Operations*: <https://www.mongodb.com/docs/languages/python/pymongo-driver/current/crud/bulk-write/>
 
-## Repository link
-
-https://github.com/yerkebttt/municipal-air-quality-batch-ingestion
+Repository: <https://github.com/yerkebttt/municipal-air-quality-batch-ingestion>
