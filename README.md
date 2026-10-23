@@ -4,17 +4,19 @@ A stakeholder-driven batch pipeline that turns hourly sensor files into quality-
 
 ## Real-life scenario and stakeholders
 
-The intended production setting is a municipality receiving signed hourly exports from its own calibrated monitoring network. The included UCI Beijing dataset is a **historical test fixture** used to exercise scale and missing-data behaviour; it is not evidence about another city.
+The intended production setting is a municipality receiving signed hourly exports from its own calibrated monitoring network. The included UCI Beijing dataset is a **historical test fixture** used to exercise scale, schema variation and missing-data behaviour; it is not the purpose of the system and it is not evidence about another city.
 
-| Stakeholder | Decision or action | Data contract | Acceptance target |
-|---|---|---|---|
-| Environmental analyst | Investigate trends, gaps and anomalous readings | Raw station-hour records, quality flags and daily aggregates | Missing/out-of-range values remain visible; no silent zero filling |
-| City planner and policy team | Compare areas and before/after periods for interventions | Station comparison with observation counts and date window | One-month comparison completes within the prototype 2 s query SLA |
-| Public dashboard developer | Display recent conditions and trend charts | Latest 24 records and daily series by station | Indexed query completes within 2 s; quality status travels with readings |
-| Data engineer/steward | Operate and audit the feed | Run status, heartbeat, counters, quarantine and benchmark history | Every run ends `succeeded` or `failed`; source rows reconcile |
-| Authorised warning officer | Review threshold candidates before downstream notification | Only quality-accepted candidates plus an approved threshold policy | Prototype sends no alert; missing policy approval blocks notification |
+The product was designed from five usage contracts. Each contract connects a real action to the required data and then to an implemented system characteristic.
 
-Hourly values can support operational trends, but they may be too coarse or too noisy for some exposure and health questions. A domain owner must define aggregation windows, legal thresholds and acceptable uncertainty before such use.
+| Stakeholder and action | Required data and output | Quality and timing expectation | Derived system characteristic | Verifiable acceptance |
+|---|---|---|---|---|
+| Public dashboard developer displays the latest conditions and a trend chart | Latest 24 station-hours; daily pollutant series; timestamps and quality status | Refresh after each hourly batch; missing data must be visible | Stable document fields, timezone-aware timestamps and `{station, timestamp}` index | Both indexed queries finish within the prototype 2 s SLA |
+| Environmental analyst investigates trends, gaps and doubtful readings | Raw source values; warning reasons; min/mean/max and observation count | No silent correction; preserve record-level provenance | Quality flags are stored beside every reading; absent values remain absent | Source rows reconcile and warning records remain queryable |
+| City planner compares locations or periods before discussing an intervention | Same pollutant and window across stations; count per aggregate | Comparable windows; limitations must accompany interpretation | Cross-station time index and aggregation returning count as well as values | One-month comparison finishes within 2 s and identifies its date window |
+| Data steward operates and audits the feed | Run status, heartbeat, counters, failures, quarantine and benchmarks | Every row is accounted for; every run reaches a terminal status | `ingestion_runs`, `rejected_measurements`, reconciliation gate and bounded retry | A mismatch fails the job; replay creates no additional measurements |
+| Authorised warning officer reviews possible threshold cases | Quality-accepted candidates and an approved local threshold policy | Human review and named accountability are mandatory | Example policy is explicitly unapproved; query only, no notification channel | Unapproved policy cannot produce a public alert |
+
+Hourly values can support operational trends, but they may be too coarse or too noisy for some exposure and health questions. A domain owner must define aggregation windows, legal thresholds and acceptable uncertainty before such use. The complete usage specification is in [`docs/stakeholder-contracts.md`](docs/stakeholder-contracts.md).
 
 ## Architecture
 
@@ -120,7 +122,7 @@ A prototype run succeeds when: all 420,768 source rows reconcile as stored or qu
 - `tests/` - transformation, quality, idempotency-key and query-contract tests
 - `validation/` - reproducible source-profile and benchmark evidence
 
-The assessed portfolio PDFs are intentionally not published in this open repository because they are examination submissions.
+The assessed portfolio PDFs are intentionally not published in this open repository because they are examination submissions. GitHub Actions runs the unit-test suite for every push and pull request; the full data and latency verification remains a local Docker acceptance test because it downloads and stores 420,768 records.
 
 ## References
 
@@ -129,5 +131,6 @@ The assessed portfolio PDFs are intentionally not published in this open reposit
 - MongoDB, *Schema Validation*: <https://www.mongodb.com/docs/manual/core/schema-validation/>
 - MongoDB, *Indexes*: <https://www.mongodb.com/docs/manual/indexes/>
 - MongoDB, *Bulk Write Operations*: <https://www.mongodb.com/docs/languages/python/pymongo-driver/current/crud/bulk-write/>
+- IU International University of Applied Sciences, *Data Engineering* (DLBDSEDE01 course book, version 001-2023-0814): concepts applied include reliability, batch job status, replayability, auditability, data governance, Docker and DataOps monitoring.
 
 Repository: <https://github.com/yerkebttt/municipal-air-quality-batch-ingestion>

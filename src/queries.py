@@ -147,7 +147,7 @@ def run_benchmark(database: Database, sla_ms: int) -> dict[str, Any]:
     collection = database["measurements"]
     checks = [
         timed_query(
-            "planner_latest_24h",
+            "dashboard_latest_24h",
             sla_ms,
             lambda: latest_readings(collection, DEFAULT_STATION, 24),
         ),
@@ -207,7 +207,7 @@ def main() -> None:
         collection = database["measurements"]
         if args.command == "latest":
             result: Any = timed_query(
-                "planner_latest_24h", args.sla_ms,
+                "dashboard_latest_24h", args.sla_ms,
                 lambda: latest_readings(collection, args.station, 24),
             )
         elif args.command == "trend":

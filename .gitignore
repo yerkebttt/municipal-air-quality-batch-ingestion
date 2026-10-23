@@ -5,3 +5,5 @@ __pycache__/
 .DS_Store
 output/
 docs/*.pdf
+tmp/
+tools/generate_reports.py
